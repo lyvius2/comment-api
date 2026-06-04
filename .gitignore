@@ -1,0 +1,91 @@
+# ===========================
+# Go
+# ===========================
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go build
+/comment-api
+/bin/
+/dist/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency vendor directory
+vendor/
+
+# ===========================
+# Environment & Secrets
+# ===========================
+.env
+.env.*
+!.env.example
+
+# ===========================
+# IDE / Editor
+# ===========================
+# JetBrains (GoLand, IntelliJ)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+
+# Emacs
+*#
+.#*
+
+# ===========================
+# OS
+# ===========================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ===========================
+# Logs & Temp
+# ===========================
+*.log
+logs/
+tmp/
+temp/
+
+# ===========================
+# Test & Coverage
+# ===========================
+coverage.out
+coverage.html
+*.coverprofile
+
+# ===========================
+# Docker
+# ===========================
+docker-compose.override.yml
+
