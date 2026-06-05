@@ -588,10 +588,59 @@ w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"
 - JSON 역직렬화 실패 시 기본값으로 처리 금지 — 오류 반환 필수 (IsAdmin 기본값 false 신뢰 금지)
 
 ### 테스트
-- `_test.go` 파일은 각 패키지 디렉터리에 위치
+
+#### 기본 규칙
+- 테스트 파일은 소스와 **별도 경로**에 위치: `test/` 디렉터리 아래 원본 경로를 그대로 미러링
+  ```
+  internal/auth/github_oauth.go  →  test/internal/auth/github_oauth_test.go
+  internal/comment/handler.go    →  test/internal/comment/handler_test.go
+  ```
+- 패키지 선언: `package auth_test` (외부 테스트 패키지 — exported 심볼만 사용)
+- 테스트 함수명: `TestXxx_상황_기대결과` 형식 (예: `TestLogout_NoCommentSession_Returns403`)
+- 실행: `go test ./...` (전체) / `go test ./test/internal/auth/...` (패키지 단위)
+
+#### 의존성
+| 용도 | 라이브러리 |
+|------|-----------|
+| Assert / Mock | `github.com/stretchr/testify` |
+| 통합 테스트 (실제 DB·Redis) | `github.com/testcontainers/testcontainers-go` |
+
+#### 단위 테스트
 - Mock은 `testify/mock` 사용
 - Redis Mock: `go-redis/v9` 의 `UniversalClient` 인터페이스 기반 Mock 구현
-- 통합 테스트는 `testcontainers-go`로 실제 DB 구동 권장
+- HTTP 핸들러 테스트: `net/http/httptest` 의 `httptest.NewRecorder()` + `httptest.NewRequest()` 사용
+- 외부 의존성(GitHub API 등)은 인터페이스로 추상화하여 Mock 교체 가능하게 설계
+
+```go
+// 핸들러 단위 테스트 패턴
+func TestCallback_InvalidState_Returns400(t *testing.T) {
+    rr := httptest.NewRecorder()
+    req := httptest.NewRequest(http.MethodGet, "/auth/github/callback?state=bad&code=xxx", nil)
+
+    handler.Callback(rr, req)
+
+    assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+```
+
+#### 통합 테스트
+- `testcontainers-go`로 실제 Redis·MongoDB 컨테이너를 구동하여 테스트
+- 파일명: `xxx_integration_test.go`, 빌드 태그 `//go:build integration` 사용
+- 실행: `go test -tags integration ./...`
+
+```go
+//go:build integration
+
+func TestSaveSession_Integration(t *testing.T) {
+    ctx := context.Background()
+    redisC, _ := redis.RunContainer(ctx, ...)
+    // 실제 Redis에 저장·조회 검증
+}
+```
+
+#### 커버리지
+- 각 패키지 핵심 로직(service, repository, auth) 커버리지 **80% 이상** 목표
+- 확인: `go test -cover ./...`
 
 ### 추가 구현 시 참고
 - Rate Limiting: `rate:limit:{ip}` Redis 키 사용 (분당 60회 제한), IP는 `r.RemoteAddr` 사용 (`X-Forwarded-For` 신뢰 금지)

@@ -17,13 +17,14 @@ import (
 	"comment-api/pkg/response"
 )
 
-const oauthStateCookie = "OAUTH_STATE"
+const OAuthStateCookie = "OAUTH_STATE"
 const oauthStateTTL = 5 * time.Minute
 
 type GitHubHandler struct {
-	cfg         *config.Config
-	oauthConfig *oauth2.Config
-	rdb         *redis.Client
+	cfg          *config.Config
+	oauthConfig  *oauth2.Config
+	rdb          *redis.Client
+	githubAPIURL string // 테스트에서 오버라이드 가능
 }
 
 func NewGitHubHandler(cfg *config.Config, rdb *redis.Client) *GitHubHandler {
@@ -36,7 +37,8 @@ func NewGitHubHandler(cfg *config.Config, rdb *redis.Client) *GitHubHandler {
 			Scopes:       []string{"user:email"},
 			Endpoint:     github.Endpoint,
 		},
-		rdb: rdb,
+		rdb:          rdb,
+		githubAPIURL: "https://api.github.com/user",
 	}
 }
 
@@ -51,7 +53,7 @@ func (h *GitHubHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     oauthStateCookie,
+		Name:     OAuthStateCookie,
 		Value:    state,
 		HttpOnly: true,
 		Secure:   h.isProduction(),
@@ -74,7 +76,7 @@ func (h *GitHubHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ① 쿠키 OAUTH_STATE == state 검증 (클라이언트 바인딩)
-	stateCookie, err := r.Cookie(oauthStateCookie)
+	stateCookie, err := r.Cookie(OAuthStateCookie)
 	if err != nil || stateCookie.Value != state {
 		response.Error(w, http.StatusBadRequest, "state 검증 실패.")
 		return
@@ -96,7 +98,7 @@ func (h *GitHubHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// GitHub 사용자 정보 조회
-	user, err := fetchGitHubUser(r.Context(), token.AccessToken)
+	user, err := h.fetchGitHubUser(r.Context(), token.AccessToken)
 	if err != nil {
 		slog.Error("failed to fetch github user", "error", err)
 		response.Error(w, http.StatusInternalServerError, "사용자 정보 조회 중 오류가 발생했습니다.")
@@ -114,7 +116,7 @@ func (h *GitHubHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ttl := time.Duration(h.cfg.SessionTTLSeconds) * time.Second
-	if err := saveSession(r.Context(), h.rdb, sessionID, session, ttl); err != nil {
+	if err := SaveSession(r.Context(), h.rdb, sessionID, session, ttl); err != nil {
 		slog.Error("failed to save session", "error", err)
 		response.Error(w, http.StatusInternalServerError, "세션 생성 중 오류가 발생했습니다.")
 		return
@@ -132,11 +134,11 @@ func (h *GitHubHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Domain:   h.cfg.SessionCookieDomain,
 	})
 
-	// OAUTH_STATE 임시 쿠키 삭제
+	// OAUTH_STATE 임시 쿠키 삭제 (MaxAge: -1 → Set-Cookie: Max-Age=0)
 	http.SetCookie(w, &http.Cookie{
-		Name:   oauthStateCookie,
+		Name:   OAuthStateCookie,
 		Value:  "",
-		MaxAge: 0,
+		MaxAge: -1,
 		Path:   "/",
 	})
 
@@ -158,8 +160,8 @@ type githubUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-func fetchGitHubUser(ctx context.Context, accessToken string) (*githubUser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user", nil)
+func (h *GitHubHandler) fetchGitHubUser(ctx context.Context, accessToken string) (*githubUser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, h.githubAPIURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -193,19 +195,28 @@ func (h *GitHubHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := deleteSession(r.Context(), h.rdb, cookie.Value); err != nil {
+	if err := DeleteSession(r.Context(), h.rdb, cookie.Value); err != nil {
 		slog.Error("failed to delete session", "error", err)
 		// 삭제 실패해도 클라이언트 쿠키는 반드시 만료 처리
 	}
 
+	// COMMENT_SESSION 쿠키 삭제 (MaxAge: -1 → Set-Cookie: Max-Age=0)
 	http.SetCookie(w, &http.Cookie{
 		Name:   h.cfg.CommentSessionCookie,
 		Value:  "",
-		MaxAge: 0,
+		MaxAge: -1,
 		Path:   "/",
 	})
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// SetGitHubAPIURL은 테스트에서 GitHub API URL을 목서버로 교체할 때 사용합니다.
+func (h *GitHubHandler) SetGitHubAPIURL(url string) { h.githubAPIURL = url }
+
+// SetOAuthEndpoint는 테스트에서 OAuth 토큰 엔드포인트를 목서버로 교체할 때 사용합니다.
+func (h *GitHubHandler) SetOAuthEndpoint(endpoint oauth2.Endpoint) {
+	h.oauthConfig.Endpoint = endpoint
 }
 
 func (h *GitHubHandler) isProduction() bool {

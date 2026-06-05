@@ -22,7 +22,7 @@ func SessionMiddleware(cfg *config.Config, rdb *redis.Client) func(http.Handler)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if cookie, err := r.Cookie(cfg.CommentSessionCookie); err == nil {
-				session, err := getSession(r.Context(), rdb, cookie.Value)
+				session, err := GetSession(r.Context(), rdb, cookie.Value)
 				if err != nil {
 					response.Error(w, http.StatusUnauthorized, "인증이 필요합니다.")
 					return
@@ -33,7 +33,7 @@ func SessionMiddleware(cfg *config.Config, rdb *redis.Client) func(http.Handler)
 			}
 
 			if cookie, err := r.Cookie(cfg.LifelogSessionCookie); err == nil {
-				member, err := getJavaSession(r.Context(), rdb, cookie.Value, cfg.LifelogSessionAttr)
+				member, err := GetJavaSession(r.Context(), rdb, cookie.Value, cfg.LifelogSessionAttr)
 				if err != nil {
 					response.Error(w, http.StatusUnauthorized, "인증이 필요합니다.")
 					return
