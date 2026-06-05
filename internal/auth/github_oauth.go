@@ -184,6 +184,30 @@ func fetchGitHubUser(ctx context.Context, accessToken string) (*githubUser, erro
 	return &user, nil
 }
 
+// Logout handles POST /auth/logout — Go 세션 삭제 및 COMMENT_SESSION 쿠키 만료
+func (h *GitHubHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(h.cfg.CommentSessionCookie)
+	if err != nil {
+		// 관리자 세션(LIFELOG_SESSION)은 Go 로그아웃 대상이 아님
+		response.Error(w, http.StatusForbidden, "관리자 세션은 로그아웃할 수 없습니다.")
+		return
+	}
+
+	if err := deleteSession(r.Context(), h.rdb, cookie.Value); err != nil {
+		slog.Error("failed to delete session", "error", err)
+		// 삭제 실패해도 클라이언트 쿠키는 반드시 만료 처리
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:   h.cfg.CommentSessionCookie,
+		Value:  "",
+		MaxAge: 0,
+		Path:   "/",
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *GitHubHandler) isProduction() bool {
 	return h.cfg.AppEnv == "production"
 }

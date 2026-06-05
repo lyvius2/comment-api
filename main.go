@@ -21,7 +21,7 @@ func main() {
 
 	githubHandler := auth.NewGitHubHandler(cfg, rdb)
 
-	mux := router.New(githubHandler)
+	mux := router.New(cfg, rdb, githubHandler)
 
 	slog.Info("starting server", "port", cfg.AppPort, "env", cfg.AppEnv)
 	if err := http.ListenAndServe(":"+cfg.AppPort, mux); err != nil {
