@@ -1,3 +1,20 @@
+// Package main은 comment-api 서버의 진입점입니다.
+//
+// @title           Comment API
+// @version         1.0
+// @description     댓글 및 사진 댓글 CRUD REST API. 인증은 쿠키 기반 세션으로 처리됩니다.
+// @host            localhost:8081
+// @BasePath        /
+//
+// @securityDefinitions.apikey CommentSession
+// @in              cookie
+// @name            COMMENT_SESSION
+// @description     GitHub SSO로 발급된 일반 사용자 세션 쿠키
+//
+// @securityDefinitions.apikey LifelogSession
+// @in              cookie
+// @name            LIFELOG_SESSION
+// @description     lifelog(Java)에서 발급된 관리자 세션 쿠키 (읽기 전용)
 package main
 
 import (
@@ -6,6 +23,7 @@ import (
 	"net/http"
 
 	"comment-api/config"
+	_ "comment-api/docs"
 	"comment-api/internal/auth"
 	"comment-api/internal/comment"
 	"comment-api/internal/photocomment"

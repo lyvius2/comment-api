@@ -20,6 +20,16 @@ func NewHandler(svc Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// ListPhotoComments godoc
+// @Summary      사진 댓글 목록 조회
+// @Description  photoSeq에 해당하는 사진 댓글 목록을 반환합니다.
+// @Tags         photo-comments
+// @Produce      json
+// @Param        photoSeq  query   int64   true  "사진 ID"
+// @Success      200  {object}  response.Response{data=[]PhotoCommentResponse}
+// @Failure      400  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/photo-comments [get]
 func (h *Handler) ListPhotoComments(w http.ResponseWriter, r *http.Request) {
 	photoSeq, err := parsePositiveInt64(r.URL.Query().Get("photoSeq"))
 	if err != nil {
@@ -36,6 +46,19 @@ func (h *Handler) ListPhotoComments(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusOK, comments)
 }
 
+// CreatePhotoComment godoc
+// @Summary      사진 댓글 작성
+// @Description  사진에 새 댓글을 작성합니다. COMMENT_SESSION 쿠키가 필요합니다.
+// @Tags         photo-comments
+// @Accept       json
+// @Produce      json
+// @Param        request  body  CreatePhotoCommentRequest  true  "사진 댓글 작성 요청"
+// @Security     CommentSession
+// @Success      201  {object}  response.Response
+// @Failure      400  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/photo-comments [post]
 func (h *Handler) CreatePhotoComment(w http.ResponseWriter, r *http.Request) {
 	session := auth.CommentSessionFromCtx(r.Context())
 	if session == nil {
@@ -57,6 +80,22 @@ func (h *Handler) CreatePhotoComment(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusCreated, nil)
 }
 
+// UpdatePhotoComment godoc
+// @Summary      사진 댓글 수정
+// @Description  사진 댓글 내용을 수정합니다. 작성자(CommentSession) 또는 관리자(LifelogSession)만 수정 가능합니다.
+// @Tags         photo-comments
+// @Accept       json
+// @Produce      json
+// @Param        commentId  path  string                    true  "댓글 ID (ObjectID hex)"
+// @Param        request    body  UpdatePhotoCommentRequest  true  "사진 댓글 수정 요청"
+// @Security     CommentSession
+// @Security     LifelogSession
+// @Success      200  {object}  response.Response
+// @Failure      400  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Failure      404  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/photo-comments/{commentId} [put]
 func (h *Handler) UpdatePhotoComment(w http.ResponseWriter, r *http.Request) {
 	id, err := parseObjectID(r.PathValue("commentId"))
 	if err != nil {
@@ -80,6 +119,20 @@ func (h *Handler) UpdatePhotoComment(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusOK, nil)
 }
 
+// DeletePhotoComment godoc
+// @Summary      사진 댓글 삭제
+// @Description  사진 댓글을 소프트 삭제합니다. 작성자(CommentSession) 또는 관리자(LifelogSession)만 삭제 가능합니다.
+// @Tags         photo-comments
+// @Produce      json
+// @Param        commentId  path  string  true  "댓글 ID (ObjectID hex)"
+// @Security     CommentSession
+// @Security     LifelogSession
+// @Success      204
+// @Failure      400  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Failure      404  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/photo-comments/{commentId} [delete]
 func (h *Handler) DeletePhotoComment(w http.ResponseWriter, r *http.Request) {
 	id, err := parseObjectID(r.PathValue("commentId"))
 	if err != nil {

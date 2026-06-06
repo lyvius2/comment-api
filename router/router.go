@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"comment-api/config"
 	"comment-api/internal/auth"
@@ -21,6 +22,9 @@ func New(
 ) http.Handler {
 	mux := http.NewServeMux()
 	sessionMW := auth.SessionMiddleware(cfg, rdb)
+
+	// Swagger UI
+	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	// Auth
 	mux.HandleFunc("GET /auth/github", githubHandler.Login)
@@ -43,7 +47,7 @@ func New(
 	mux.Handle("PUT /api/photo-comments/{commentId}", sessionMW(http.HandlerFunc(photoHandler.UpdatePhotoComment)))
 	mux.Handle("DELETE /api/photo-comments/{commentId}", sessionMW(http.HandlerFunc(photoHandler.DeletePhotoComment)))
 
-	return corsMiddleware(cfg)(mux)
+	return corsMiddleware(cfg)(RateLimitMiddleware(rdb)(mux))
 }
 
 func corsMiddleware(cfg *config.Config) func(http.Handler) http.Handler {

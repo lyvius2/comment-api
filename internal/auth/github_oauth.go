@@ -42,7 +42,13 @@ func NewGitHubHandler(cfg *config.Config, rdb *redis.Client) *GitHubHandler {
 	}
 }
 
-// Login handles GET /auth/github — state 생성 후 GitHub OAuth 인증 페이지로 리다이렉트
+// Login godoc
+// @Summary      GitHub OAuth 로그인 시작
+// @Description  GitHub OAuth 인증 페이지로 리다이렉트합니다. OAUTH_STATE 쿠키가 발급됩니다.
+// @Tags         auth
+// @Success      302
+// @Failure      500 {object} response.Response
+// @Router       /auth/github [get]
 func (h *GitHubHandler) Login(w http.ResponseWriter, r *http.Request) {
 	state := uuid.NewString()
 
@@ -65,7 +71,17 @@ func (h *GitHubHandler) Login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.oauthConfig.AuthCodeURL(state), http.StatusFound)
 }
 
-// Callback handles GET /auth/github/callback — code 교환, 세션 생성, COMMENT_SESSION 쿠키 발급
+// Callback godoc
+// @Summary      GitHub OAuth 콜백 처리
+// @Description  GitHub에서 받은 code와 state로 토큰 교환 후 COMMENT_SESSION 쿠키를 발급합니다. AUTH_SUCCESS_URL 설정 시 해당 URL로 리다이렉트합니다.
+// @Tags         auth
+// @Param        code   query  string  true  "GitHub OAuth authorization code"
+// @Param        state  query  string  true  "CSRF state 값"
+// @Success      302
+// @Success      200  {object}  response.Response
+// @Failure      400  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /auth/github/callback [get]
 func (h *GitHubHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 	code := r.URL.Query().Get("code")
@@ -186,7 +202,14 @@ func (h *GitHubHandler) fetchGitHubUser(ctx context.Context, accessToken string)
 	return &user, nil
 }
 
-// Logout handles POST /auth/logout — Go 세션 삭제 및 COMMENT_SESSION 쿠키 만료
+// Logout godoc
+// @Summary      로그아웃
+// @Description  COMMENT_SESSION 쿠키를 만료시키고 Redis에서 세션을 삭제합니다. 관리자 세션(LIFELOG_SESSION)은 대상이 아닙니다.
+// @Tags         auth
+// @Security     CommentSession
+// @Success      204
+// @Failure      403  {object}  response.Response
+// @Router       /auth/logout [post]
 func (h *GitHubHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(h.cfg.CommentSessionCookie)
 	if err != nil {

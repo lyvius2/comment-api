@@ -25,6 +25,16 @@ func NewHandler(svc Service, rdb *redis.Client, cfg *config.Config) *Handler {
 	return &Handler{svc: svc, rdb: rdb, cfg: cfg}
 }
 
+// ListComments godoc
+// @Summary      게시물 댓글 목록 조회
+// @Description  postSeq에 해당하는 댓글을 트리 구조로 반환합니다.
+// @Tags         comments
+// @Produce      json
+// @Param        postSeq  query   int64   true  "게시물 ID"
+// @Success      200  {object}  response.Response{data=[]CommentResponse}
+// @Failure      400  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/comments [get]
 func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 	postSeq, err := parsePositiveInt64(r.URL.Query().Get("postSeq"))
 	if err != nil {
@@ -41,6 +51,19 @@ func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusOK, comments)
 }
 
+// CreateComment godoc
+// @Summary      댓글 작성
+// @Description  게시물에 새 댓글을 작성합니다. COMMENT_SESSION 쿠키가 필요합니다.
+// @Tags         comments
+// @Accept       json
+// @Produce      json
+// @Param        request  body  CreateCommentRequest  true  "댓글 작성 요청"
+// @Security     CommentSession
+// @Success      201  {object}  response.Response
+// @Failure      400  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/comments [post]
 func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	session := auth.CommentSessionFromCtx(r.Context())
 	if session == nil {
@@ -62,6 +85,21 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusCreated, nil)
 }
 
+// CreateReply godoc
+// @Summary      답글 작성
+// @Description  특정 댓글에 답글을 작성합니다. 최대 depth=2까지 허용됩니다. COMMENT_SESSION 쿠키가 필요합니다.
+// @Tags         comments
+// @Accept       json
+// @Produce      json
+// @Param        commentId  path  string              true  "부모 댓글 ID (ObjectID hex)"
+// @Param        request    body  CreateReplyRequest  true  "답글 작성 요청"
+// @Security     CommentSession
+// @Success      201  {object}  response.Response
+// @Failure      400  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Failure      404  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/comments/{commentId}/replies [post]
 func (h *Handler) CreateReply(w http.ResponseWriter, r *http.Request) {
 	session := auth.CommentSessionFromCtx(r.Context())
 	if session == nil {
@@ -89,6 +127,22 @@ func (h *Handler) CreateReply(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusCreated, nil)
 }
 
+// UpdateComment godoc
+// @Summary      댓글 수정
+// @Description  댓글 내용을 수정합니다. 작성자(CommentSession) 또는 관리자(LifelogSession)만 수정 가능합니다.
+// @Tags         comments
+// @Accept       json
+// @Produce      json
+// @Param        commentId  path  string               true  "댓글 ID (ObjectID hex)"
+// @Param        request    body  UpdateCommentRequest  true  "댓글 수정 요청"
+// @Security     CommentSession
+// @Security     LifelogSession
+// @Success      200  {object}  response.Response
+// @Failure      400  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Failure      404  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/comments/{commentId} [put]
 func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	id, err := parseObjectID(r.PathValue("commentId"))
 	if err != nil {
@@ -112,6 +166,20 @@ func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, http.StatusOK, nil)
 }
 
+// DeleteComment godoc
+// @Summary      댓글 삭제
+// @Description  댓글을 소프트 삭제합니다. 작성자(CommentSession) 또는 관리자(LifelogSession)만 삭제 가능합니다.
+// @Tags         comments
+// @Produce      json
+// @Param        commentId  path  string  true  "댓글 ID (ObjectID hex)"
+// @Security     CommentSession
+// @Security     LifelogSession
+// @Success      204
+// @Failure      400  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Failure      404  {object}  response.Response
+// @Failure      500  {object}  response.Response
+// @Router       /api/comments/{commentId} [delete]
 func (h *Handler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	id, err := parseObjectID(r.PathValue("commentId"))
 	if err != nil {
@@ -129,6 +197,15 @@ func (h *Handler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Heartbeat godoc
+// @Summary      세션 유지 (하트비트)
+// @Description  COMMENT_SESSION 쿠키의 TTL을 갱신합니다.
+// @Tags         comments
+// @Security     CommentSession
+// @Success      204
+// @Failure      401  {object}  response.Response
+// @Failure      403  {object}  response.Response
+// @Router       /api/comments/user/session/heartbeat [post]
 func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	session := auth.CommentSessionFromCtx(r.Context())
 	if session == nil {
