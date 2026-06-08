@@ -11,6 +11,7 @@ import (
 	"comment-api/internal/auth"
 	"comment-api/internal/comment"
 	"comment-api/internal/photocomment"
+	"comment-api/pkg/metrics"
 )
 
 func New(
@@ -22,6 +23,9 @@ func New(
 ) http.Handler {
 	mux := http.NewServeMux()
 	sessionMW := auth.SessionMiddleware(cfg, rdb)
+
+	// Prometheus metrics endpoint (no auth required)
+	mux.Handle("GET /metrics", metrics.Handler())
 
 	// Swagger UI
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
@@ -47,7 +51,7 @@ func New(
 	mux.Handle("PUT /api/photo-comments/{commentId}", sessionMW(http.HandlerFunc(photoHandler.UpdatePhotoComment)))
 	mux.Handle("DELETE /api/photo-comments/{commentId}", sessionMW(http.HandlerFunc(photoHandler.DeletePhotoComment)))
 
-	return corsMiddleware(cfg)(RateLimitMiddleware(rdb)(mux))
+	return metrics.InstrumentHandler(corsMiddleware(cfg)(RateLimitMiddleware(rdb)(mux)))
 }
 
 func corsMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
